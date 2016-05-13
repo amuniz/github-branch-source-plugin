@@ -236,6 +236,8 @@ public class GitHubSCMSource extends AbstractGitSCMSource {
                 return;
             }
             String fullName = repoOwner + "/" + repository;
+
+            Connector.cacheFlush(github);
             final GHRepository repo = github.getRepository(fullName);
             listener.getLogger().format("Looking up %s%n", HyperlinkNote.encodeTo(repo.getHtmlUrl().toString(), fullName));
             doRetrieve(observer, listener, repo);

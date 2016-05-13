@@ -41,9 +41,13 @@ import com.squareup.okhttp.OkUrlFactory;
 import hudson.Util;
 import hudson.security.ACL;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.Proxy;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
@@ -66,6 +70,8 @@ import static org.jenkinsci.plugins.github.internal.GitHubClientCacheOps.toCache
  * Utilities that could perhaps be moved into {@code github-api}.
  */
 public class Connector {
+
+    private static final Logger LOGGER = Logger.getLogger(Connector.class.getName());
 
     public static @CheckForNull StandardCredentials lookupScanCredentials(@CheckForNull SCMSourceOwner context, @CheckForNull String apiUri, @CheckForNull String scanCredentialsId) {
         if (Util.fixEmpty(scanCredentialsId) == null) {
@@ -103,6 +109,12 @@ public class Connector {
         gb.withRateLimitHandler(CUSTOMIZED);
         OkHttpClient client = new OkHttpClient().setProxy(getProxy(defaultIfBlank(apiUrl, GITHUB_URL)));
 
+        client.setCache(GitHubClientCacheOps.toCacheDir().apply(config));
+        if (config.getClientCacheSize() > 0) {
+            Cache cache = toCacheDir().apply(config);
+            client.setCache(cache);
+        }
+
         gb.withConnector(new OkHttpConnector(new OkUrlFactory(client)));
 
         if (credentials == null) {
@@ -116,6 +128,18 @@ public class Connector {
         }
 
         return gb.build();
+    }
+
+    public static void cacheFlush(GitHub gh) {
+        try {
+            OkHttpConnector okHttpConnector = (OkHttpConnector) gh.getConnector();
+            Field field = okHttpConnector.getClass().getDeclaredField("urlFactory");
+            field.setAccessible(true);
+            OkUrlFactory urlFactory = (OkUrlFactory) field.get(okHttpConnector);
+            urlFactory.client().getCache().evictAll();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Can not flush GitHub client cache", e);
+        }
     }
 
     public static void fillScanCredentialsIdItems(StandardListBoxModel result, @CheckForNull SCMSourceOwner context, @CheckForNull String apiUri) {

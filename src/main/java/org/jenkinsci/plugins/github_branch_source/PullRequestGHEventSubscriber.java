@@ -118,7 +118,7 @@ public class PullRequestGHEventSubscriber extends GHEventsSubscriber {
                         }
                     });
                 }
-            }, 10, TimeUnit.SECONDS);
+            }, 5, TimeUnit.SECONDS);
         } else {
             LOGGER.log(Level.WARNING, "Malformed repository URL {0}", repoUrl);
         }
